@@ -74,18 +74,22 @@ do
 done
 
 
-WORK_DIR=".work"
-if [ -d ${WORK_DIR} ]; then
-    rm -fr ${WORK_DIR}
-fi
-mkdir -p ${WORK_DIR}
+function hander() {
+    WORK_DIR=".work"
+    if [ -d ${WORK_DIR} ]; then
+        rm -fr ${WORK_DIR}
+    fi
+    mkdir -p ${WORK_DIR}
 
-cd ${WORK_DIR}
-aws s3 --profile "${PROFILE}" cp s3://"${SOURCE}" . --recursive > /dev/null
+    cd ${WORK_DIR}
+    aws s3 --profile "${PROFILE}" cp s3://"${SOURCE}" . --recursive > /dev/null
 
-# schellcheck disable=SC2038
-find . -type f -name "aws-*" \
-    | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}"
+    # schellcheck disable=SC2038
+    find . -type f -name "aws-*" \
+        | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}"
 
-(cd - && rm -fr ${WORK_DIR}) > /dev/null
+    (cd - && rm -fr ${WORK_DIR}) > /dev/null
+}
+
+hander
 exit 0
