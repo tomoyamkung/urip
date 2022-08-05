@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  URIPFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Environment:
+        Variables:
+          BUCKET: "value"  # TBD
+      FunctionName: urip
+      Handler: function.handler
+      Role: arn:aws:iam::xxx:role/xxx  # TBD
+      Runtime: provided
+      Timeout: 180
+    Metadata:
+      BuildMethod: makefile
