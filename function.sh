@@ -21,15 +21,11 @@ Description:
     3. 該当したログのクライアント IP を出力する
 
 Usage:
-    $(basename "${0}") --profile PROFILE_NAME --source S3_SOURCE uri
+    $(basename "${0}") --profile PROFILE_NAME '{"path": "/path/to","uri": "/hoge"}'
 
 Options:
     --help      print this.
                 これを出力します。
-    --profile   Required fields. Specify the profile of the AWS account you want to search.
-                必須項目です。検索したい AWS アカウントのプロファイルを指定します。
-    --source    Required fields. Specify the bucket name and path where the WAF logs are stored. For example, "bucket_name /path/to".
-                必須項目です。WAF のログが保管してあるバケット名とパスを指定します。例えば、"bucket_name/path/to" と指定します。
 EOF
 }
 
@@ -48,16 +44,7 @@ do
             else
                 PROFILE="${2}"
                 echo "PROFILE:${PROFILE}"
-                shift
-            fi
-            ;;
-        --source)
-            if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
-                echo "'option' requires an argument." 1>&2
-                exit 3
-            else
-                SOURCE="${2}"
-                echo "SOURCE:${SOURCE}"
+                readonly PROFILE
                 shift
             fi
             ;;
@@ -66,23 +53,48 @@ do
             exit 1
             ;;
         *)
-            URI="${1}"
-            echo "URI:${URI}"
+            EVENT_DATA="${1}"
+            echo "EVENT_DATA:${EVENT_DATA}"
+            readonly EVENT_DATA
+            exit 1
             ;;
     esac
     shift
 done
 
+function to_params() {
+    # params:'{"path": "/path/to","uri": "/hoge"}' => BUCKET_PATH=/path/to, URI=/hoge
+    local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
+
+    if echo "${cleaning}" | awk -F, '{print $1}' | grep -q "^path" ; then
+        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+        URI=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+    else
+        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+        URI=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+    fi
+
+    readonly BUCKET_PATH
+    readonly URI
+}
 
 function hander() {
-    WORK_DIR=".work"
+    # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
+    local -r _event_data="${1}"
+    to_params "${_event_data}"
+    # echo "BUCKET_PATH:${BUCKET_PATH}"  # debug_message
+    # echo "URI:${URI}"  # debug_message
+
+    local -r WORK_DIR=".work"
     if [ -d ${WORK_DIR} ]; then
         rm -fr ${WORK_DIR}
     fi
     mkdir -p ${WORK_DIR}
 
     cd ${WORK_DIR}
-    aws s3 --profile "${PROFILE}" cp s3://"${SOURCE}" . --recursive > /dev/null
+    aws s3 --profile "${PROFILE}" cp s3://"${BUCKET}${BUCKET_PATH}" . --recursive > /dev/null
+    # ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
+    # ${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
 
     # schellcheck disable=SC2038
     find . -type f -name "aws-*" \
@@ -91,5 +103,5 @@ function hander() {
     (cd - && rm -fr ${WORK_DIR}) > /dev/null
 }
 
-hander
+hander "${EVENT_DATA}"
 exit 0
