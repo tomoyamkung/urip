@@ -32,5 +32,5 @@ function handler() {
 
     local -r result=$(find . -type f -name "aws-*" \
         | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}")
-    echo "${result}" 1>&2;
+    echo "${result}" 1>&2;  # => clientIp, headers, coutry
 }
