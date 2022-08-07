@@ -9,6 +9,7 @@ Resources:
       Environment:
         Variables:
           BUCKET: "value"  # TBD
+          SLACK_WEBHOOK_URL: "value"  # TBD
       FunctionName: urip
       Handler: function.handler
       Role: arn:aws:iam::xxx:role/xxx  # TBD
