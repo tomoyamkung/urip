@@ -25,11 +25,14 @@ function to_params() {
 function handler() {
     # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
 
+    echo "${1}" 1>&2;
+
     to_params "${1}"
 
     aws s3 cp s3://"${BUCKET}/${BUCKET_PATH}" . --recursive > /dev/null
     # [Caution] ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
     # 【注意】${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
+
     local -r result=$(find . -type f -name "aws-*" \
         | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}")
     echo "${result}" 1>&2;  # => clientIp, headers, coutry
