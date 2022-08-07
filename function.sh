@@ -3,7 +3,8 @@
 set -euo pipefail
 
 function to_params() {
-    # params:'{"path": "/path/to","uri": "/hoge"}' => BUCKET_PATH=/path/to, URI=/hoge
+    # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
+    # => BUCKET_PATH=/path/to, URI=/hoge
 
     local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
 
