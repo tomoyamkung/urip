@@ -39,4 +39,10 @@ function handler() {
 
     local -r clientip=$(echo "${result}" | grep "clientIp" | awk '{print $2}' | sed -e 's/\"//g' | sed -e 's/,$//g' | sort | uniq)
     echo "${clientip}" 1>&2;  # => clientIp
+
+    curl -X POST -H 'Content-type: application/json' -d "{\"text\":\"${clientip}\"}" "${SLACK_WEBHOOK_URL}"
+    # Slack's Incoming Webhook only notifies the client IP.
+    # Slack の Incoming Webhook には クライアント IP だけを通知する
+    # [Caution] ${SLACK_WEBHOOK_URL} is the Slack's Incoming Webhook. It should be set to an environment variable.
+    # 【注意】${SLACK_WEBHOOK_URL} は Slack の Incoming Webhook。環境変数に設定しておくこと。
 }
