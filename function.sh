@@ -3,7 +3,8 @@
 set -euo pipefail
 
 function to_params() {
-    # params:'{"path": "/path/to","uri": "/hoge"}' => BUCKET_PATH=/path/to, URI=/hoge
+    # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
+    # => BUCKET_PATH=/path/to, URI=/hoge
 
     local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
 
@@ -17,20 +18,31 @@ function to_params() {
 
     readonly BUCKET_PATH
     readonly URI
+    # echo "BUCKET_PATH:${BUCKET_PATH}"  # debug_message
+    # echo "URI:${URI}"  # debug_message
 }
 
 function handler() {
     # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
-    local -r _event_data="${1}"
-    to_params "${_event_data}"
-    # echo "BUCKET_PATH:${BUCKET_PATH}"  # debug_message
-    # echo "URI:${URI}"  # debug_message
 
-    aws s3 cp s3://"${BUCKET}${BUCKET_PATH}" . --recursive > /dev/null
-    # ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
-    # ${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
+    echo "${1}" 1>&2;
+
+    to_params "${1}"
+
+    aws s3 cp s3://"${BUCKET}/${BUCKET_PATH}" . --recursive > /dev/null
+    # [Caution] ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
+    # 【注意】${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
 
     local -r result=$(find . -type f -name "aws-*" \
         | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}")
-    echo "${result}" 1>&2;
+    echo "${result}" 1>&2;  # => clientIp, headers, coutry
+
+    local -r clientip=$(echo "${result}" | grep "clientIp" | awk '{print $2}' | sed -e 's/\"//g' | sed -e 's/,$//g' | sort | uniq)
+    echo "${clientip}" 1>&2;  # => clientIp
+
+    curl -X POST -H 'Content-type: application/json' -d "{\"text\":\"${clientip}\"}" "${SLACK_WEBHOOK_URL}"
+    # Slack's Incoming Webhook only notifies the client IP.
+    # Slack の Incoming Webhook には クライアント IP だけを通知する
+    # [Caution] ${SLACK_WEBHOOK_URL} is the Slack's Incoming Webhook. It should be set to an environment variable.
+    # 【注意】${SLACK_WEBHOOK_URL} は Slack の Incoming Webhook。環境変数に設定しておくこと。
 }
