@@ -3,9 +3,9 @@
 set -euo pipefail
 
 function to_params() {
-    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
-    # => BUCKET_PATH=path/to, URI=/hoge
-    local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
+    # e.g. ${1} = '{ "params": ["path/to", "/uri"] }'
+    # => BUCKET_PATH=path/to, URI=/uri
+    local -r cleaning=$(echo "${1}" | sed -e 's/.*\[\(.*\)\].*/\1/g' | tr -d '"' | tr -d ' ')
 
     if echo "${cleaning}" | awk -F, '{print $1}' | grep -q "^path" ; then
         BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
@@ -22,7 +22,7 @@ function to_params() {
 }
 
 function handler() {
-    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
+    # e.g. ${1} = '{ "params": ["path/to", "/uri"] }'
 
     echo "${1}" 1>&2;
 

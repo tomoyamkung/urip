@@ -89,7 +89,6 @@ AWS Lambda から実行する。
 
 ```json
 {
-    "path": "path/to",
-    "uri": "/hoge"
+    "params": ["path/to", "/uri"]
 }
 ```
