@@ -3,9 +3,8 @@
 set -euo pipefail
 
 function to_params() {
-    # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
-    # => BUCKET_PATH=/path/to, URI=/hoge
-
+    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
+    # => BUCKET_PATH=path/to, URI=/hoge
     local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
 
     if echo "${cleaning}" | awk -F, '{print $1}' | grep -q "^path" ; then
@@ -23,7 +22,7 @@ function to_params() {
 }
 
 function handler() {
-    # e.g. ${1} = '{"path": "/path/to","uri": "/hoge"}'
+    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
 
     echo "${1}" 1>&2;
 
