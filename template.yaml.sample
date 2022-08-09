@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  URIPFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Environment:
+        Variables:
+          BUCKET: "value"  # TBD
+          SLACK_WEBHOOK_URL: "value"  # TBD
+      FunctionName: urip
+      Handler: function.handler
+      Role: !GetAtt IamRole.Arn
+      Runtime: provided
+      Timeout: 180
+    Metadata:
+      BuildMethod: makefile
+  IamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              sts:AssumeRole
+            Principal:
+              Service: lambda.amazonaws.com
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess

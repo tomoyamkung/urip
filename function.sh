@@ -2,90 +2,64 @@
 # shellcheck disable=SC3040
 set -euo pipefail
 
+function to_params() {
+    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
+    # => BUCKET_PATH=path/to, URI=/hoge
+    local -r cleaning=$(echo "${1}" | tr -d '{' | tr -d '}' | tr -d '"' | tr -d ' ')
 
-function usage() {
-    cat <<EOF 1>&2
-Description:
-    $(basename "${0}") is a tool that looks up client IPs in AWS WAF logs.
-    The behavior of this tool is as follows.
+    if echo "${cleaning}" | awk -F, '{print $1}' | grep -q "^path" ; then
+        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+        URI=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+    else
+        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+        URI=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+    fi
 
-    1. Run s3 cp to copy the WAF log to your working directory
-    2. Search the log by URI
-    3. Output the client IP of the corresponding log
-
-    $(basename "${0}") は AWS WAF のログからクライアント IP を検索するツールです。
-    このツールの挙動は以下の通りです。
-
-    1. s3 cp を実行して、作業ディレクトリに WAF のログをコピーする
-    2. ログに対して URI で検索する
-    3. 該当したログのクライアント IP を出力する
-
-Usage:
-    $(basename "${0}") --profile PROFILE_NAME --source S3_SOURCE uri
-
-Options:
-    --help      print this.
-                これを出力します。
-    --profile   Required fields. Specify the profile of the AWS account you want to search.
-                必須項目です。検索したい AWS アカウントのプロファイルを指定します。
-    --source    Required fields. Specify the bucket name and path where the WAF logs are stored. For example, "bucket_name /path/to".
-                必須項目です。WAF のログが保管してあるバケット名とパスを指定します。例えば、"bucket_name/path/to" と指定します。
-EOF
+    readonly BUCKET_PATH
+    readonly URI
+    # echo "BUCKET_PATH:${BUCKET_PATH}"  # debug_message
+    # echo "URI:${URI}"  # debug_message
 }
 
+function handler() {
+    # e.g. ${1} = '{"path": "path/to","uri": "/hoge"}'
 
-while (( $# > 0 ))
-do
-    case $1 in
-        --help)
-            usage
-            exit 1
-            ;;
-        --profile)
-            if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
-                echo "'option' requires an argument." 1>&2
-                exit 2
-            else
-                PROFILE="${2}"
-                echo "PROFILE:${PROFILE}"
-                shift
-            fi
-            ;;
-        --source)
-            if [[ -z "$2" ]] || [[ "$2" =~ ^-+ ]]; then
-                echo "'option' requires an argument." 1>&2
-                exit 3
-            else
-                SOURCE="${2}"
-                echo "SOURCE:${SOURCE}"
-                shift
-            fi
-            ;;
-        -*)
-            usage
-            exit 1
-            ;;
-        *)
-            URI="${1}"
-            echo "URI:${URI}"
-            ;;
-    esac
-    shift
-done
+    echo "${1}" 1>&2;
 
+    to_params "${1}"
 
-WORK_DIR=".work"
-if [ -d ${WORK_DIR} ]; then
-    rm -fr ${WORK_DIR}
-fi
-mkdir -p ${WORK_DIR}
+    # Download log files to the working directory.
+    # 作業ディレクトリにログファイルをダウンロードする
+    WORK_DIR=".work"
+    if [ -d ${WORK_DIR} ]; then
+        rm -fr ${WORK_DIR}
+    fi
+    mkdir -p ${WORK_DIR}
 
-cd ${WORK_DIR}
-aws s3 --profile "${PROFILE}" cp s3://"${SOURCE}" . --recursive > /dev/null
+    cd ${WORK_DIR}
+    aws s3 cp s3://"${BUCKET}/${BUCKET_PATH}" . --recursive > /dev/null
+    # [Caution] ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
+    # 【注意】${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
 
-# schellcheck disable=SC2038
-find . -type f -name "aws-*" \
-    | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}"
+    # If the log file does not exist, the process is terminated.
+    # ログファイルが存在しなければ処理を終了する。
+    if [ -z "$(ls .)" ] ; then
+        (cd - && rm -fr ${WORK_DIR}) > /dev/null
+        curl -X POST -H 'Content-type: application/json' -d "{\"text\":\"Log files is not found.\"}" "${SLACK_WEBHOOK_URL}"
+        exit 1;
+    fi
 
-(cd - && rm -fr ${WORK_DIR}) > /dev/null
-exit 0
+    local -r result=$(find . -type f -name "aws-*" \
+        | xargs jq "select(.action == \"ALLOW\" and .httpRequest.uri == \"${URI}\") | {clientIp: .httpRequest.clientIp, headers: .httpRequest.headers, coutry: .httpRequest.country}")
+    echo "${result}" 1>&2;  # => clientIp, headers, coutry
+
+    local -r clientip=$(echo "${result}" | grep "clientIp" | awk '{print $2}' | sed -e 's/\"//g' | sed -e 's/,$//g' | sort | uniq)
+    echo "${clientip}" 1>&2;  # => clientIp
+
+    (cd - && rm -fr ${WORK_DIR}) > /dev/null
+    curl -X POST -H 'Content-type: application/json' -d "{\"text\":\"${URI}:${clientip}\"}" "${SLACK_WEBHOOK_URL}"
+    # Slack's Incoming Webhook only notifies the client IP.
+    # Slack の Incoming Webhook には クライアント IP だけを通知する
+    # [Caution] ${SLACK_WEBHOOK_URL} is the Slack's Incoming Webhook. It should be set to an environment variable.
+    # 【注意】${SLACK_WEBHOOK_URL} は Slack の Incoming Webhook。環境変数に設定しておくこと。
+}
