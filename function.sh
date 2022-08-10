@@ -7,18 +7,13 @@ function to_params() {
     # => BUCKET_PATH=path/to, URI=/uri
     local -r cleaning=$(echo "${1}" | sed -e 's/.*\[\(.*\)\].*/\1/g' | tr -d '"' | tr -d ' ')
 
-    if echo "${cleaning}" | awk -F, '{print $1}' | grep -q "^path" ; then
-        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
-        URI=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
-    else
-        BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
-        URI=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
-    fi
+    BUCKET_PATH=$(echo "${cleaning}" | awk -F, '{print $1}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
+    URI=$(echo "${cleaning}" | awk -F, '{print $2}' | sed -e 's/^\([^:]*\):\(.*\)$/\2/')
 
     readonly BUCKET_PATH
     readonly URI
-    # echo "BUCKET_PATH:${BUCKET_PATH}"  # debug_message
-    # echo "URI:${URI}"  # debug_message
+    echo "BUCKET_PATH:${BUCKET_PATH}" 1>&2; # debug_message
+    echo "URI:${URI}" 1>&2; # debug_message
 }
 
 function handler() {
@@ -37,7 +32,7 @@ function handler() {
     mkdir -p ${WORK_DIR}
 
     cd ${WORK_DIR}
-    aws s3 cp s3://"${BUCKET}/${BUCKET_PATH}" . --recursive > /dev/null
+    aws s3 cp s3://"${BUCKET}/${BUCKET_PATH}" . --recursive 1>&2; # debug_message
     # [Caution] ${BUCKET} is the bucket name in S3. It should be set to an environment variable.
     # 【注意】${BUCKET} はS3 のバケット名。環境変数に設定しておくこと。
 
