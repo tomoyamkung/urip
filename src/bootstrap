@@ -4,23 +4,9 @@ set -euo pipefail
 
 # Environment Variables
 # 環境設定
+# 作業ディレクトリを作成して、そこにログファイルをダウンロードするので、/tmp に移動する
 export HOME="/tmp"
-export BIN_DIR="${HOME}/.local/bin"
-export PATH="${BIN_DIR}:$PATH"
-
-
-# Installing aws cli
-# aws cli のインストール
 cd "${HOME}"
-curl -sSL https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py
-python3 get-pip.py --user
-pip3 install awscli --user
-
-
-# Install jq. Download the binary and add it to your path.
-# jq のインストール。バイナリをダウンロードしてパスに追加する
-curl -sSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o "${BIN_DIR}"/jq
-chmod +x "${BIN_DIR}"/jq
 
 
 # Initialization - load function handler
